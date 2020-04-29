@@ -1,0 +1,4 @@
+deeppavlov
+flask
+flask-json-schema
+flask-cors

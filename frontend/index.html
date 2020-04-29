@@ -1,0 +1,333 @@
+<!--
+ Copyright 2020 MERA
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ or implied. See the License for the specific language governing
+ permissions and limitations under the License.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<title>NLP Embeddings Visualizer</title>
+
+	<link rel="stylesheet" href="./3rdParty/MaterialDesign-Webfont/css/materialdesignicons.min.css">
+	<link rel="stylesheet" href="./3rdParty/vuetify/vuetify-v2.2.15.min.css">
+	<link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+	<div id="application">
+		<v-app>
+			<v-app-bar app clipped-left tile color="blue-grey lighten-3">
+				<v-toolbar-title>NLP Embeddings Visualizer</v-toolbar-title>
+			</v-app-bar>
+
+				<!-- -->
+			<v-navigation-drawer expand-on-hover mini-variant app clipped width="650">
+				<v-list-item class="blue-grey lighten-4">
+					<v-list-item-title class="headline">Input dialog</v-list-item-title>
+					<v-btn icon @click="showApplicationSettingsDialog" class="float-right">
+						<v-icon>mdi-cog</v-icon>
+					</v-btn>
+				</v-list-item>
+				<v-divider></v-divider>
+				<v-divider></v-divider>
+
+				<!-- New comparison -->
+				<v-list-item>
+					<v-list-item-content>
+						<v-list-item-title class="title">Comparison</v-list-item-title>
+						<v-card-actions>
+							<v-btn color="red darken-1" text @click.shift.exact="dropComparisonHistory">Drop history</v-btn>
+							<v-spacer></v-spacer>
+							<input type="file" ref="loadSingleFileRef" class="hidden-ctl" @input="loadComparison" multiple></input>
+							<v-btn color="blue darken-1" text @click="$refs.loadSingleFileRef.click()">Load</v-btn>
+						</v-card-actions>
+						<v-card-actions>
+							<v-spacer></v-spacer>
+							<v-btn color="green darken-1" text @click="startNewComparison">+ New</v-btn>
+						</v-card-actions>
+						<v-card-actions>
+							<v-btn color="red darken-1" text @click="resetAllData">Reset All</v-btn>
+							<v-spacer></v-spacer>
+							<v-btn color="green darken-1" text @click="saveAllData">Save All</v-btn>
+						</v-card-actions>
+					</v-list-item-content>
+				</v-list-item>
+				<v-divider></v-divider>
+
+
+				<!-- INPUT KIND SELECTOR -->
+				<v-list-item>
+					<v-list-item-content>
+						<v-list-item-title class="title">Input kind</v-list-item-title>
+						<v-btn-toggle v-model="inputMenu.storeInto" mandatory tile>
+							<v-btn>First</v-btn>
+							<v-btn>Second</v-btn>
+							<v-btn>Step</v-btn>
+						</v-btn-toggle>
+					</v-list-item-content>
+				</v-list-item>
+				<v-divider></v-divider>
+
+
+				<v-tabs v-model="inputMenu.inputSourceTab" grow>
+					<v-tab>From File</v-tab>
+					<v-tab>From Server</v-tab>
+					<v-tab>Manual</v-tab>
+				</v-tabs>
+				<v-tabs-items v-model="inputMenu.inputSourceTab">
+					<!-- FROM FILE INPUT -->
+					<v-tab-item>
+						<v-list-item><v-list-item-content>
+							<v-list-item-title class="title">From file</v-list-item-title>
+
+							<!-- file input dialog -->
+							<v-file-input clearable v-model="inputMenu.fromFile.uploadedFile"></v-file-input>
+
+							<!-- preview/load buttons -->
+							<v-card-actions>
+								<v-spacer></v-spacer>
+								<v-btn color="green darken-1" text @click="retrieveInputContentsFromFile" :disabled="!inputMenu.fromFile.uploadedFile">Load</v-btn>
+							</v-card-actions>
+						</v-list-item-content></v-list-item>
+					</v-tab-item>
+
+					<!-- FROM SERVER INPUT -->
+					<v-tab-item>
+						<v-list-item><v-list-item-content>
+							<v-list-item-title class="title">
+								<v-row justify="space-between">
+									<v-col cols="auto">
+										From server
+									</v-col>
+									<v-col cols="1" class="mr-3">
+										<v-btn icon @click="showServerSettingsDialog"><v-icon>mdi-cog</v-icon></v-btn>
+									</v-col>
+								</v-row>
+							</v-list-item-title>
+
+
+							<!-- text field-->
+							<v-textarea name="requestText" label="Text to send" v-model="inputMenu.fromServer.textToSend">
+							</v-textarea>
+
+							<!-- send request button -->
+							<v-card-actions style="margin-top: -20px">
+								<v-btn color="indigo" text @click="expandServerTextToSend">Expand</v-btn>
+								<v-spacer></v-spacer>
+								<v-btn color="green darken-1" text @click="retrieveInputContentsFromServer">Request</v-btn>
+							</v-card-actions>
+
+						</v-list-item-content></v-list-item>
+					</v-tab-item>
+
+					<!-- MANUAL INPUT -->
+					<v-tab-item>
+						<v-list-item><v-list-item-content>
+							<v-list-item-title class="title">Manual input</v-list-item-title>
+
+							<!-- text field-->
+							<v-textarea name="requestText" label="Input JSON" v-model="inputMenu.manual.inputJSON">
+							</v-textarea>
+
+							<!-- send request button -->
+							<v-card-actions style="margin-top: -20px">
+								<v-btn color="indigo" text @click="expandManualInput">Expand</v-btn>
+								<v-spacer></v-spacer>
+								<v-btn color="green darken-1" text @click="loadManualInput">Load</v-btn>
+							</v-card-actions>
+						</v-list-item-content></v-list-item>
+					</v-tab-item>
+				</v-tabs-items>
+
+				<v-divider></v-divider>
+			</v-navigation-drawer>
+
+
+
+			<v-content class="grey lighten-5">
+				<v-container>
+					<v-row align="baseline" justify="start">
+						<v-col>
+							<v-card>
+								<!-- page caption -->
+								<v-card-title class="title blue-grey lighten-5">The input data</v-card-title>
+								<v-divider></v-divider>
+								<v-divider></v-divider>
+
+								<!-- data-holding div -->
+								<div class="pb-2 ml-2 mr-2">
+
+									<!-- every expansion panel is current /history item -->
+									<v-expansion-panels active-class="no-nested-padding" focusable accordion>
+										<v-expansion-panel v-for="(item, index) in inputData" :key="`history-entry-${index}`">
+											<v-expansion-panel-header>
+												<span style="width: 300px">
+													<v-icon v-if="index !== 0">mdi-history</v-icon>
+													<v-icon v-else>mdi-arrow-right-bold-circle</v-icon>
+													{{ getHistoryPanelHeader(index) }}
+													<v-btn class="float-none" icon x-small @click.native.stop="renameHistoryItem(index)">
+														<v-icon>mdi-pencil</v-icon>
+													</v-btn>
+												</span>
+												<span>
+													<v-tooltip top>
+														<template v-slot:activator="{ on }">
+															<v-btn v-on="on" class="float-right" icon small @click.native.shift.stop="removeHistoryItem(index)">
+																<v-icon>mdi-delete</v-icon>
+															</v-btn>
+														</template>
+														<span class="bold">Noop unless clicked without shift</span>
+													</v-tooltip>
+													<v-btn class="float-right" icon small @click.native.stop="saveItem(index)">
+														<v-icon>mdi-content-save</v-icon>
+													</v-btn>
+													<v-btn class="float-right" icon small @click.native.stop="duplicateItem(index)">
+														<v-icon>mdi-content-copy</v-icon>
+													</v-btn>
+													<v-btn class="float-right" icon small @click.native.stop="makeCurrent(index)">
+														<v-icon>mdi-upload</v-icon>
+													</v-btn>
+													<v-btn class="float-right" icon small @click.native.stop="moveUp(index)">
+														<v-icon>mdi-arrow-up</v-icon>
+													</v-btn>
+													<v-btn class="float-right" icon small @click.native.stop="moveDown(index)">
+														<v-icon>mdi-arrow-down</v-icon>
+													</v-btn>
+												</span>
+											</v-expansion-panel-header>
+
+											<v-expansion-panel-content>
+												<v-card>
+													<v-card-title>Data metainformation</v-card-title>
+													<v-row align="baseline" justify="start">
+														<v-col cols="6">
+															<v-expansion-panels v-if="item.first.meta">
+																<v-expansion-panel focusable accordion>
+																	<v-expansion-panel-header><span>
+																		<v-icon small>mdi-table</v-icon> Meta-information of the first input
+																	</span></v-expansion-panel-header>
+																	<v-expansion-panel-content>
+																		<v-textarea v-for="(item, key) in item.first.meta" :label="key" :value="item" readonly :key="key"></v-textarea>
+																	</v-expansion-panel-content>
+																</v-expansion-panel>
+															</v-expansion-panels>
+														</v-col>
+
+														<v-col cols="6">
+															<v-expansion-panels v-if="item.second.meta">
+																<v-expansion-panel focusable accordion>
+																	<v-expansion-panel-header><span>
+																		<v-icon small>mdi-table</v-icon> Meta-information of the second input
+																	</span></v-expansion-panel-header>
+																	<v-expansion-panel-content>
+																		<v-textarea v-for="(item, key) in item.second.meta" :label="key" :value="item" readonly :key="key"></v-textarea>
+																	</v-expansion-panel-content>
+																</v-expansion-panel>
+															</v-expansion-panels>
+														</v-col>
+													</v-row>
+												</v-card>
+
+												<ml-visualized-data :first="item.first.object" :second="item.second.object" :preview-interpolation-size="appConfiguration.previewChartPoints"></ml-visualized-data>
+											</v-expansion-panel-content>
+
+										</v-expansion-panel>
+									</v-expansion-panels>
+								</div>
+							</v-card>
+						</v-col>
+					</v-row>
+				</v-container>
+			</v-content>
+
+
+			<!-- APPLICATION SETTINGS -->
+			<v-dialog v-model="applicationSettingsDialog.shown" key="app-settings" max-width="600px" persistent>
+				<v-card>
+					<v-card-title class="headline">Application settings</v-card-title>
+					<v-card-text>
+						<v-container>
+							<v-text-field label="Double comparison precision *" required v-model="applicationSettingsDialog.numberComparisonPrecision" :error-messages="applicationSettingsDialog.numberComparisonPrecisionErrors"></v-text-field>
+							<v-text-field label="Preview charts interpolation *" required v-model="applicationSettingsDialog.previewChartPoints" :error-messages="applicationSettingsDialog.previewChartPointsErrors"></v-text-field>
+						</v-container>
+					</v-card-text>
+
+
+					<v-card-actions>
+						<v-btn color="red darken-1" text @click="resetApplicationConfig">Reset</v-btn>
+						<v-spacer></v-spacer>
+						<v-btn color="yellow darken-1" text @click="cancelApplicationSettingsDialog">Cancel</v-btn>
+						<v-btn color="green darken-1" text @click="submitApplicationSettingsDialog">Ok</v-btn>
+					</v-card-actions>
+				</v-card>
+			</v-dialog>
+
+			<!-- FROM SERVER SETTINGS -->
+			<v-dialog v-model="serverSettingsDialog.shown" key="server-settings" max-width="900px" persistent>
+				<v-card>
+					<v-card-title class="headline">Server settings</v-card-title>
+					<v-card-text>
+						<v-container>
+							<v-text-field label="Server address *" required v-model.number="serverSettingsDialog.serverUrl" :error-messages="serverSettingsDialog.serverUrlErrors"></v-text-field>
+							<v-textarea label="JSON options delegate body *" rows="15" required v-model="serverSettingsDialog.requestOptions" :error-messages="serverSettingsDialog.requestOptionsErrors"></v-textarea>
+						</v-container>
+					</v-card-text>
+
+
+					<v-card-actions>
+						<v-btn color="red darken-1" text @click="resetServerConfig">Reset</v-btn>
+						<v-spacer></v-spacer>
+						<v-btn color="yellow darken-1" text @click="cancelServerSettingsDialog">Cancel</v-btn>
+						<v-btn color="green darken-1" text @click="submitServerSettingsDialog">Ok</v-btn>
+					</v-card-actions>
+				</v-card>
+			</v-dialog>
+
+
+			<text-input-window width="400px" ref="smallTextInput"></text-input-window>
+			<text-input-window width="90%" :lines="25" ref="largeTextInput"></text-input-window>
+			<ok-cancel-dialog ref="okCancelDialog"></ok-cancel-dialog>
+
+			<v-snackbar v-model="notification.enabled" :timeout="notification.tmo" :color="notification.color" vertical>
+				{{ notification.text }}
+				<v-btn text @click="notification.enabled = false">Close</v-btn>
+			</v-snackbar>
+
+			<v-footer app>
+				<span> <a href="https://www.mera.com/" target="_blank" rel="noopener noreferrer">MERA</a> &copy; 2020</span>
+			</v-footer>
+		</v-app>
+	</div>
+
+	<!-- 3rdParties -->
+	<script src="./3rdParty/plotly-latest.min.js"></script>
+
+	<!-- Vue/Vuetify -->
+	<script src="./3rdParty/vue/vue.min.js"></script>
+	<script src="./3rdParty/vuetify/vuetify-v2.2.15.min.js"></script>
+
+	<!-- local libraries/components -->
+	<script src="./js/input-data-component.js"></script>
+	<script src="./js/text-input-window.js"></script>
+	<script src="./js/ok-cancel-dialog.js"></script>
+	<script src="./js/plotly-component.js"></script>
+	<script src="./js/defaults.js"></script>
+	<script src="./js/input.js"></script>
+	<script src="./js/utils.js"></script>
+
+	<!-- main script -->
+	<script src="./main.js"></script>
+</body>
+</html>
